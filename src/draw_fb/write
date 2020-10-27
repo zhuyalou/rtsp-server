@@ -1,0 +1,1 @@
+sudo ./main /dev/fb0 1.png

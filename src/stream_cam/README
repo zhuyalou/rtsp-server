@@ -1,0 +1,63 @@
+Thư viện sử dụng:
+	- GStreamer (GStreamer 1.8.3 gồm các gói base, good, ugly, bad, libav, rtsp-server)
+	Lưu ý: để sử dụng element avdec_h264 (decode H264) phải cài plugin libav
+	- OpenCV 2. (OpenCV 2.4.9) 
+	Lưu ý: Có thể cài đặt song song 2 bản OpenCV 2. và 3. , tuy nhiên nên cài đặt vào 2 đường dẫn thư mục khác nhau.
+		Nếu muốn sử dụng bản OpenCV nào thì gõ lệnh sau trước khi compile code
+		export PKG_CONFIG_PATH=/đường/dẫn/đến/thư/mục/OpenCV/lib/pkgconfig
+	- Code Firedetection version 1.7 by Trần Minh Tân
+
+
+
+Note:
+	- x264enc hỗ trợ đầu vào các format: Y444, Y42B, I420, YV12, NV12. Do đó dùng element capsfilter để đổi format.
+	- Để xem đầu vào đầu ra của element: search google "tên-element gstreamer" (vd: x264enc gstreamer), chọn trang thuộc trang chủ gstreamer, xem phần Element Pads. sink là đầu vào, src là đầu ra
+	- jpegenc có hỗ trợ đầu vào format RGB
+	- avdec_h264 là element decode của H264
+	
+
+
+Về file code: 
+	- file stream_udp hiện đang dùng jpegenc và file stream_rtsp đang dùng x264enc
+	- Sử dụng 2 luồng, 1 luồng capture image qua USB camera (/dev/video), 1 luồng stream dữ liệu
+	- Pipeline: 
+		appsrc -> videoconvert -> capsfilter -> encoder (x264enc, jpegenc) -> rtppay (rtph264pay, rtpjpegpay) -> udpsink / rtsp
+	- Đối với file stream_udp: Sửa giá trị 2 biến cameraWidth, cameraHeight bằng với của camera
+	- Đối với file stream_rtsp: Sửa giá trị 2 biến cameraWidth, cameraHeight và width height của element capsfilter bằng với của camera
+	- file code stream_udp stream tốt hơn stream_rtsp, do code stream_rtsp chưa tốt
+
+
+
+Lệnh compile:
+	- stream_udp :	
+	  g++ -std=c++11 stream_udp.cpp firedetection.cpp -o udp -lpthread -lgstapp-1.0 `pkg-config --libs --cflags opencv gstreamer-1.0`
+	
+	- stream_rtsp :
+	  g++ -std=c++11 stream_rtsp.cpp firedetection.cpp -o rtsp -lpthread -lgstapp-1.0 `pkg-config --libs --cflags opencv gstreamer-1.0 gstreamer-rtsp-server-1.0`	
+
+
+
+Xem stream:
+	- stream_udp:
+
+	jpegenc: gst-launch-1.0 udpsrc port=5000 ! application/x-rtp, encoding-name=JPEG, payload=26 ! rtpjpegdepay ! jpegdec ! videoconvert ! autovideosink
+	x264enc: gst-launch-1.0 udpsrc port=5000 ! application/x-rtp, encoding-name=H264, payload=26 ! rtph264depay ! avdec_h264 ! videoconvert ! autovideosink
+
+	- stream_rtsp:
+
+	jpegenc: gst-launch-1.0 rtspsrc location=rtsp://127.0.0.1:8554/test latency=10 ! rtpjpegdepay ! jpegdec ! videoconvert ! autovideosink
+	x264enc: gst-launch-1.0 rtspsrc location=rtsp://127.0.0.1:8554/test latency=10 ! rtph264depay ! avdec_h264 ! videoconvert ! autovideosink
+	vlc: vlc rtsp://127.0.0.1:8554/test
+	gst-launch-1.0 rtspsrc location=rtsp://127.0.0.1:8554/test latency=10 ! decodebin ! autovideosink
+
+
+	(stream tcp) gst-launch-1.0 tcpclientsrc host=127.0.0.1 port=5000 ! gdpdepay ! rtpjpegdepay ! jpegdec ! videoconvert ! autovideosink
+
+
+
+Tham khảo:
+	- example test-appsrc.c có sẵn của rtsp-server
+	- https://www.youtube.com/watch?v=7Xdry76ek5E
+
+
+
